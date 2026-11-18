@@ -6,6 +6,7 @@
 
 using std::vector;
 using std::string;
+using std::cout;
 
 
 class Pista
@@ -60,14 +61,12 @@ public:
 	}
 
 
-	int getAncho()
-	{
+	int getAncho()const{
 		return ancho;
 	}
 
 
-	int getAlto()
-	{
+	int getAlto()const{
 		return alto;
 	}
 
@@ -78,8 +77,7 @@ public:
 	}
 
 
-	vector<vector<char>> getMatriz()
-	{
+	vector<vector<char>> getMatriz()const{
 		return matriz;
 	}
 
@@ -157,7 +155,7 @@ public:
 		if (!posicionValida(fila, columna))
 		{
 
-			return;
+			return '\0';
 
 		}
 
@@ -178,10 +176,10 @@ public:
 			for (int j = 0; j < ancho; j++)
 			{
 
-				cout << matriz[i][j];
+				std::cout << matriz[i][j];
 			
 			}
-			cout << endl;
+			std::cout << std::endl;
 
 		}
 
