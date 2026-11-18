@@ -2,6 +2,9 @@
 #include "Pista.h"
 #include "AdminPista.h"
 #include <limits>
+#include "AdminVehiculo.h"
+#include "Vehiculo.h"
+#include <vector>
 
 using namespace std;
 using std::cout;
@@ -80,6 +83,8 @@ void iniciarPartida()
 	cout << "Iniciando partida...\n";
 
 
+	//Creacion de la pista
+
 	AdminPista adminPista;
 
 	adminPista.cargarPista("Pista.txt");
@@ -87,14 +92,47 @@ void iniciarPartida()
 	Pista pista = adminPista.getPista();
 
 
+
+	//Creacion del vehiculo en la pista
+
+	AdminVehiculo adminVehiculo;
+
+	bool automovilCreado = adminVehiculo.crearVehiculo(1, 0, '▀', pista);
+
+	if (!automovilCreado)
+	{
+
+		cout << "El vehiculo esta en el taller.\n";
+		return;
+	
+	}
+
+	Vehiculo vehiculo = adminVehiculo.getVehiculo();
+
+
+
+
+	//Imprimir la pista con el vehiculo en la posicion inicial
+
 	for (int i = 0; i < pista.getAlto(); i++)
 	{
 
 		for (int j = 0; j < pista.getAncho(); j++)
 		{
 
-			cout << pista.matriz[i][j];
-		
+			if (i == vehiculo.getFila() && j == vehiculo.getColumna())
+			{
+
+				cout << vehiculo.getMarca();
+
+			}
+			else
+			{
+
+				cout << pista.matriz[i][j];
+
+			}
+			
 		}
 
 		cout << endl;
