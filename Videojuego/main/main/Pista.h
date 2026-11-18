@@ -6,8 +6,6 @@
 
 using std::vector;
 using std::string;
-using std::cout;
-using std::endl;
 
 
 class Pista
@@ -44,7 +42,7 @@ public:
 
 
 
-	Pista(vector<vector<char>> matriz, string codigo, int totalVueltas) 
+	Pista(vector<vector<char>> matriz, string codigo, int totalVueltas)
 	{
 
 		this->codigo = codigo;
@@ -62,13 +60,13 @@ public:
 	}
 
 
-	int getAncho() const
+	int getAncho()
 	{
 		return ancho;
 	}
 
 
-	int getAlto() const
+	int getAlto()
 	{
 		return alto;
 	}
@@ -80,7 +78,7 @@ public:
 	}
 
 
-	vector<vector<char>> getMatriz() const
+	vector<vector<char>> getMatriz()
 	{
 		return matriz;
 	}
@@ -153,7 +151,7 @@ public:
 	}
 
 
-	void actualizarPosicion(int fila, int columna, char marca)
+	char actualizarPosicion(int fila, int columna, char marca)
 	{
 
 		if (!posicionValida(fila, columna))
