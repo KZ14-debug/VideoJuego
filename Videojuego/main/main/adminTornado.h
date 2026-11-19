@@ -14,7 +14,7 @@ class AdminTornado
 private:
 
 	Tornado tornado;
-	std::mt19937 generador;   // se siembra UNA sola vez, al construir el AdminTornado
+	std::mt19937 generador; 
 
 
 	
@@ -191,6 +191,15 @@ public:
 		tornado.mover(tornado.getFila() + dFila[d], tornado.getColumna() + dColumna[d]);
 
 		return true;
+
+	}
+
+
+	// Coloca el tornado en una celda concreta (sirve para pruebas)
+	void colocar(int fila, int columna)
+	{
+
+		tornado.mover(fila, columna);
 
 	}
 

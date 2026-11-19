@@ -120,6 +120,10 @@ void tablaPosiciones()
 {
 
 	cout << "\n";
-	cout << "Tabla de posiciones\n";
+	cout << "Tabla de posiciones\n\n";
+
+	AdminRegistro adminRegistro;
+
+	adminRegistro.imprimirMejores(10);
 
 }

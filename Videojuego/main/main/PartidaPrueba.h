@@ -5,6 +5,7 @@
 #include <vector>
 #include <thread>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <conio.h>
 
@@ -19,43 +20,99 @@
 #include "AdminPista.h"
 #include "AdminVehiculo.h"
 #include "AdminTornado.h"
+#include "AdminTuerca.h"
 #include "Logica.h"
 #include "Temporizador.h"
+#include "Efectos.h"
+#include "Registro.h"
+#include "AdminRegistro.h"
 
 using std::cout;
 using std::string;
 using std::vector;
 
 
-// ---------------- OPCIONES DE PRUEBA (cambielas segun lo que necesite) ----------------
-const int  TICK_MS = 500;        // duracion de cada tick (mas grande = mas lento)
-const bool MODO_PASO = true;    // true: el juego avanza UN tick por cada tecla (ideal para depurar)
+// cosas para debugear
+const int  TICK_MS = 50;        // duracion de ticks
+const bool MODO_PASO = false;    // true: el juego avanza UN tick por cada tecla 
 const bool GUARDAR_TRAZA = true; // true: escribe traza.txt con una linea por tick
+const bool TECLAS_DEBUG = false;  // true: f = terminar carrera, k = tornado sobre el auto, u = tuerca sobre el auto
 // ---------------------------------------------------------------------------------------
 
+// Velocidad del auto: VELOCIDAD_NORMAL = 1 celda por tick. La mitad = 1 celda cada 2 ticks, el doble = 2 celdas por tick.
+const int VELOCIDAD_NORMAL = 2;
+const double DURACION_LENTITUD = 5.0;   // segundos que dura el efecto del tornado
+const double DURACION_TURBO = 3.0;      // segundos que dura el efecto de la tuerca
+const int TICKS_POR_MOVIMIENTO_TORNADO = 3;   // velocidad del tornado: se mueve cada N ticks
 
-// Mueve el cursor al inicio de la consola SIN borrar (evita el parpadeo de system("cls"))
+
+//esto fue para que no parpadee
 void cursorAlInicio()
 {
 
-    #ifdef _WIN32
-        COORD origen = { 0, 0 };
-        SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), origen);
-    #else
-        cout << "\033[H";
-    #endif
+#ifdef _WIN32
+	COORD origen = { 0, 0 };
+	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), origen);
+#else
+	cout << "\033[H";
+#endif
 
 }
 
 
-// Arma TODO el cuadro en un string y lo imprime de una sola vez.
-void dibujar(Pista& pista, Vehiculo vehiculo, Tornado tornado, double tiempo, bool colision, int tick)
+string decimales(double valor, int cifras)
+{
+
+	char buffer[32];
+
+	snprintf(buffer, sizeof(buffer), "%.*f", cifras, valor);
+
+	return string(buffer);
+
+}
+
+
+// Rellena con espacios para tapar restos de un cuadro anterior
+string rellenar(string texto, size_t ancho = 90)
+{
+
+	if (texto.size() < ancho)
+	{
+
+		texto.append(ancho - texto.size(), ' ');
+
+	}
+
+	return texto + "\n";
+
+}
+
+
+bool esTeclaMovimiento(char tecla)
+{
+
+	return tecla == 'w' || tecla == 'W' || tecla == 'a' || tecla == 'A'
+		|| tecla == 's' || tecla == 'S' || tecla == 'd' || tecla == 'D';
+
+}
+
+
+
+void dibujar(Pista& pista, Vehiculo vehiculo, Tornado tornado, Tuerca tuerca, double tiempo, int tick,
+	double restanteLento, double restanteTurbo)
 {
 
 	vector<vector<char>> matriz = pista.getMatriz();   // copia: la pista original no se toca
 
+	if (tuerca.estaActiva())
+	{
+
+		matriz[tuerca.getFila()][tuerca.getColumna()] = tuerca.getMarca();
+
+	}
+
 	matriz[tornado.getFila()][tornado.getColumna()] = tornado.getMarca();
-	matriz[vehiculo.getFila()][vehiculo.getColumna()] = vehiculo.getMarca();
+	matriz[vehiculo.getFila()][vehiculo.getColumna()] = vehiculo.getMarca();   // el auto va encima de todo
 
 
 	string cuadro;
@@ -68,16 +125,32 @@ void dibujar(Pista& pista, Vehiculo vehiculo, Tornado tornado, double tiempo, bo
 
 	}
 
-	cuadro += "Tiempo: " + std::to_string(tiempo).substr(0, 5) + " s  |  Vueltas: "
-		+ std::to_string(vehiculo.getVueltasCompletadas()) + "/" + std::to_string(pista.getVueltas())
-		+ "  |  Tick: " + std::to_string(tick) + "                    \n";
+	cuadro += rellenar("Tiempo: " + decimales(tiempo, 1) + " s  |  Vueltas: " + std::to_string(vehiculo.getVueltasCompletadas())
+		+ "/" + std::to_string(pista.getVueltas()) + "  |  Velocidad: " + std::to_string(vehiculo.getVelocidad())
+		+ "  |  Tick: " + std::to_string(tick));
 
-	cuadro += "Auto (" + std::to_string(vehiculo.getFila()) + "," + std::to_string(vehiculo.getColumna()) + ")  "
-		+ "Tornado (" + std::to_string(tornado.getFila()) + "," + std::to_string(tornado.getColumna()) + ")        \n";
+	string efectos = "";
 
-	cuadro += colision ? "*** COLISION CON EL TORNADO ***      \n" : "                                    \n";
+	if (restanteLento > 0)
+	{
 
-	cuadro += "[w a s d] mover   [q] salir                      \n";
+		efectos += "[TORNADO! LENTO " + decimales(restanteLento, 1) + " s]  ";
+
+	}
+
+	if (restanteTurbo > 0)
+	{
+
+		efectos += "[TURBO " + decimales(restanteTurbo, 1) + " s]  ";
+
+	}
+
+	cuadro += rellenar(efectos);
+
+	cuadro += rellenar("Auto (" + std::to_string(vehiculo.getFila()) + "," + std::to_string(vehiculo.getColumna()) + ")  Tornado ("
+		+ std::to_string(tornado.getFila()) + "," + std::to_string(tornado.getColumna()) + ")");
+
+	cuadro += rellenar("[w a s d] mover   [q] salir");
 
 
 	cursorAlInicio();
@@ -98,11 +171,13 @@ void partidaPrueba()
 
 	Logica logica;
 	Temporizador temporizador;
+	Efectos efectos;
+	AdminRegistro adminRegistro;
 
 
 	AdminVehiculo adminVehiculo;
 
-	if (!adminVehiculo.crearVehiculo(1, 1, 'A', pista))
+	if (!adminVehiculo.crearVehiculo(1, VELOCIDAD_NORMAL, 'A', pista))
 	{
 
 		cout << "No se pudo crear el vehiculo (revise la meta en Pista.txt)." << std::endl;
@@ -110,15 +185,16 @@ void partidaPrueba()
 
 	}
 
-
-	int filaVehiculo = adminVehiculo.getVehiculo().getFila();
-	int columnaVehiculo = adminVehiculo.getVehiculo().getColumna();
+	efectos.iniciar(VELOCIDAD_NORMAL);
 
 
-	// velocidad del tornado = cada cuantos ticks se mueve
+	int filaSalida = adminVehiculo.getVehiculo().getFila();
+	int columnaSalida = adminVehiculo.getVehiculo().getColumna();
+
+
 	AdminTornado adminTornado;
 
-	if (!adminTornado.crearTornado(1, 3, 'T', pista, filaVehiculo, columnaVehiculo, 15))
+	if (!adminTornado.crearTornado(1, TICKS_POR_MOVIMIENTO_TORNADO, 'T', pista, filaSalida, columnaSalida, 15))
 	{
 
 		cout << "No se pudo crear el tornado." << std::endl;
@@ -127,13 +203,55 @@ void partidaPrueba()
 	}
 
 
+	AdminTuerca adminTuerca;
+
+	if (!adminTuerca.crearTuerca('*', pista, filaSalida, columnaSalida))
+	{
+
+		cout << "No se pudo crear la tuerca." << std::endl;
+		return;
+
+	}
+
+
+	// Revisa si el auto choco con el tornado (lentitud, y el tornado se va a otro lugar)
+	
+	auto revisarEncuentros = [&]()
+		{
+
+			Vehiculo v = adminVehiculo.getVehiculo();
+			Tornado t = adminTornado.getTornado();
+
+			if (v.getFila() == t.getFila() && v.getColumna() == t.getColumna())
+			{
+
+				// Si ya esta lento, el choque se ignora (devuelve false)
+				if (efectos.aplicarLentitud(DURACION_LENTITUD))
+				{
+
+					adminTornado.crearTornado(t.getIdTornado(), t.getVelocidad(), t.getMarca(), pista, v.getFila(), v.getColumna(), 15);
+
+				}
+
+			}
+
+			if (adminTuerca.recoger(v.getFila(), v.getColumna()))
+			{
+
+				efectos.aplicarTurbo(DURACION_TURBO);
+
+			}
+
+		};
+
+
 	std::ofstream traza;
 
 	if (GUARDAR_TRAZA)
 	{
 
 		traza.open("traza.txt");
-		traza << "tick;tecla;auto_fila;auto_col;tornado_fila;tornado_col;vueltas;colision\n";
+		traza << "tick;tecla;auto_fila;auto_col;velocidad;lento;turbo;tornado_fila;tornado_col;tuerca_fila;tuerca_col;tuerca_activa;vueltas\n";
 
 	}
 
@@ -146,6 +264,8 @@ void partidaPrueba()
 
 
 	int tick = 0;
+	int acumulador = 0;        // "presupuesto" de movimiento del auto
+	bool forzarFin = false;
 
 	temporizador.iniciar();
 
@@ -153,19 +273,31 @@ void partidaPrueba()
 	while (!logica.finCarrera(pista, adminVehiculo))
 	{
 
-		// 1) Entrada
+		efectos.actualizar(adminVehiculo);
+
+		Vehiculo vehiculoActual = adminVehiculo.getVehiculo();
+
+		adminTuerca.actualizar(pista, vehiculoActual.getFila(), vehiculoActual.getColumna());
+
+
+		// 1) Entrada: se leen todas las teclas acumuladas y se usa la ultima
 		char tecla = ' ';
 
 		if (MODO_PASO)
 		{
 
-			tecla = _getch();   // espera una tecla por cada tick (cualquier tecla que no sea wasd solo avanza el tick)
+			tecla = _getch();
 
 		}
-		else if (_kbhit())
+		else
 		{
 
-			tecla = _getch();
+			while (_kbhit())
+			{
+
+				tecla = _getch();
+
+			}
 
 		}
 
@@ -177,11 +309,64 @@ void partidaPrueba()
 		}
 
 
-		// 2) Mover auto
-		logica.moverVehiculo(filaVehiculo, columnaVehiculo, tecla, pista, adminVehiculo);
+		// Teclas debug
+		if (TECLAS_DEBUG)
+		{
+
+			if (tecla == 'f' || tecla == 'F')
+			{
+
+				forzarFin = true;
+				break;
+
+			}
+
+			if (tecla == 'k' || tecla == 'K')
+			{
+
+				adminTornado.colocar(vehiculoActual.getFila(), vehiculoActual.getColumna());
+				revisarEncuentros();
+
+			}
+
+			if (tecla == 'u' || tecla == 'U')
+			{
+
+				adminTuerca.colocar(vehiculoActual.getFila(), vehiculoActual.getColumna());
+				revisarEncuentros();
+
+			}
+
+		}
 
 
-		// 3) Mover tornado cada N ticks
+		
+		if (esTeclaMovimiento(tecla))
+		{
+
+			acumulador += adminVehiculo.getVehiculo().getVelocidad();
+
+			while (acumulador >= VELOCIDAD_NORMAL)
+			{
+
+				logica.moverVehiculo(filaSalida, columnaSalida, tecla, pista, adminVehiculo);
+				logica.verificarLineaMeta(pista, adminVehiculo);
+				revisarEncuentros();
+
+				acumulador -= VELOCIDAD_NORMAL;
+
+			}
+
+		}
+		else
+		{
+
+			acumulador = 0;
+
+		}
+
+
+		// Mover el tornado cada n ticks
 		int ticksPorMovimiento = adminTornado.getTornado().getVelocidad();
 
 		if (ticksPorMovimiento < 1)
@@ -195,32 +380,32 @@ void partidaPrueba()
 		{
 
 			adminTornado.mover(pista);
+			revisarEncuentros();
 
 		}
 
 
-		// 4) Meta y colision
-		logica.verificarLineaMeta(pista, adminVehiculo);
+		// 4) Dibujar y registrar
+		efectos.actualizar(adminVehiculo);
 
 		Vehiculo vehiculo = adminVehiculo.getVehiculo();
 		Tornado tornado = adminTornado.getTornado();
+		Tuerca tuerca = adminTuerca.getTuerca();
 
-		bool colision = (vehiculo.getFila() == tornado.getFila() && vehiculo.getColumna() == tornado.getColumna());
-
-
-		// 5) Dibujar y registrar
-		dibujar(pista, vehiculo, tornado, temporizador.getTiempo(), colision, tick);
+		dibujar(pista, vehiculo, tornado, tuerca, temporizador.getTiempo(), tick, efectos.restanteLentitud(), efectos.restanteTurbo());
 
 		if (GUARDAR_TRAZA)
 		{
 
 			traza << tick << ";" << (tecla == ' ' ? '_' : tecla) << ";" << vehiculo.getFila() << ";" << vehiculo.getColumna() << ";"
-				<< tornado.getFila() << ";" << tornado.getColumna() << ";" << vehiculo.getVueltasCompletadas() << ";" << colision << "\n";
+				<< vehiculo.getVelocidad() << ";" << efectos.estaLento() << ";" << efectos.estaTurbo() << ";"
+				<< tornado.getFila() << ";" << tornado.getColumna() << ";" << tuerca.getFila() << ";" << tuerca.getColumna() << ";"
+				<< tuerca.estaActiva() << ";" << vehiculo.getVueltasCompletadas() << "\n";
 
 		}
 
 
-		// 6) Tick
+		// 5) Esperar un tick
 		if (!MODO_PASO)
 		{
 
@@ -235,6 +420,36 @@ void partidaPrueba()
 
 	temporizador.detener();
 
-	cout << "\nFin de la partida. Tiempo: " << temporizador.getTiempo() << " s" << std::endl;
+
+	bool carreraCompleta = forzarFin || logica.finCarrera(pista, adminVehiculo);
+
+	cout << "\n";
+
+	if (!carreraCompleta)
+	{
+
+		cout << "Partida cancelada." << std::endl;
+		return;
+
+	}
+
+
+	
+	double segundos = temporizador.getTiempo();
+
+	cout << "Carrera completada! Tiempo: " << decimales(segundos, 2) << " s" << std::endl;
+	cout << "Ingrese su nombre: ";
+
+	string nombre;
+
+	std::getline(std::cin >> std::ws, nombre);
+
+	adminRegistro.guardar(Registro(nombre, (int)(segundos * 1000)));
+
+	cout << "\n--- Mejores tiempos ---\n";
+
+	adminRegistro.imprimirMejores(5);
+
+	cout << std::endl;
 
 }
