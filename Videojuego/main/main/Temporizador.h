@@ -44,7 +44,7 @@ public:
         return false;
     }
     bool getTres(){
-        if (getTiempo() >= .0){
+        if (getTiempo() >= 3.0){
             return true;
         }
         return false;

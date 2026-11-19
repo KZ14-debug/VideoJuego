@@ -1,7 +1,19 @@
+#pragma once
 #include <iostream>
+#include <vector>
+#include <thread>
+#include <chrono>
+#include <cstdlib>
+#include <conio.h>
 #include "Pista.h"
 #include "AdminPista.h"
-#include <limits>
+#include "AdminVehiculo.h"
+#include "AdminTornado.h"
+#include "Logica.h"
+#include "Temporizador.h"
+#include "PartidaPrueba.h"
+
+
 
 using namespace std;
 using std::cout;
@@ -54,7 +66,8 @@ void menuPrincipal()
 		{
 
 		case 1:
-			iniciarPartida();
+			//iniciarPartida();
+			partidaPrueba();
 			break;
 
 		case 2:
@@ -102,8 +115,6 @@ void iniciarPartida()
 	}
 
 }
-
-
 
 void tablaPosiciones()
 {
